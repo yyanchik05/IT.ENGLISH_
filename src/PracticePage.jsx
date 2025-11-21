@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import SyntaxHighlighter from 'react-syntax-highlighter';
-import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs'; 
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+// 1. ДОДАЛИ useSearchParams
+import { useSearchParams } from 'react-router-dom';
 
 function PracticePage() {
   const [tasks, setTasks] = useState([]);
@@ -10,7 +12,9 @@ function PracticePage() {
   const [output, setOutput] = useState("Ready to run...");
   const [loading, setLoading] = useState(true);
   
-  // Стан для розкриття папок (за замовчуванням відкриті)
+  // Хук для читання адреси сайту
+  const [searchParams] = useSearchParams();
+  
   const [foldersOpen, setFoldersOpen] = useState({
     junior: true,
     middle: true,
@@ -26,7 +30,27 @@ function PracticePage() {
           ...doc.data()
         }));
         setTasks(loadedTasks);
-        if (loadedTasks.length > 0) setCurrentTask(loadedTasks[0]);
+        
+        // --- НОВА ЛОГІКА: ВІДКРИВАЄМО ПАПКУ З URL ---
+        const targetLevel = searchParams.get('level'); // читаємо ?level=...
+        
+        if (targetLevel) {
+          // Якщо вибрали конкретний рівень — закриваємо інші
+          setFoldersOpen({
+            junior: targetLevel === 'junior',
+            middle: targetLevel === 'middle',
+            senior: targetLevel === 'senior'
+          });
+
+          // Пробуємо знайти перше завдання цього рівня і відкрити його
+          const firstTaskOfLevel = loadedTasks.find(t => t.level === targetLevel);
+          if (firstTaskOfLevel) setCurrentTask(firstTaskOfLevel);
+          
+        } else if (loadedTasks.length > 0) {
+          // Якщо рівня немає в адресі, просто відкриваємо перше завдання
+          setCurrentTask(loadedTasks[0]);
+        }
+
         setLoading(false);
       } catch (error) {
         console.error("Error:", error);
@@ -34,8 +58,10 @@ function PracticePage() {
       }
     };
     fetchTasks();
-  }, []);
+  }, [searchParams]); // Перезапускаємо, якщо змінюється адреса
 
+  // ... (ВЕСЬ ІНШИЙ КОД ЗАЛИШАЄТЬСЯ БЕЗ ЗМІН) ...
+  
   const runCode = (selectedOption) => {
     if (!currentTask) return;
     if (selectedOption === currentTask.correct) {
@@ -49,28 +75,23 @@ function PracticePage() {
     setFoldersOpen(prev => ({ ...prev, [level]: !prev[level] }));
   };
 
-  // Функція для фільтрації завдань по папках
   const getTasksByLevel = (level) => tasks.filter(t => t.level?.toLowerCase() === level);
 
   if (loading) return <div className="loading">Initializing Environment...</div>;
 
   return (
     <div style={styles.container}>
-      
-      {/* --- ЛІВА ПАНЕЛЬ (EXPLORER) --- */}
+      {/* --- ЛІВА ПАНЕЛЬ --- */}
       <div style={styles.sidebar}>
         <div style={styles.explorerHeader}>EXPLORER: ENGLISH-PROJECT</div>
         
-        {/* Папки рівнів */}
         {['junior', 'middle', 'senior'].map(level => (
           <div key={level}>
-            {/* Назва папки */}
             <div style={styles.folderHeader} onClick={() => toggleFolder(level)}>
               <span style={{ marginRight: 5 }}>{foldersOpen[level] ? '📂' : '📁'}</span> 
               {level.toUpperCase()}
             </div>
 
-            {/* Список файлів у папці */}
             {foldersOpen[level] && getTasksByLevel(level).map(task => (
               <div 
                 key={task.id} 
@@ -89,25 +110,20 @@ function PracticePage() {
         ))}
       </div>
 
-      {/* --- ЦЕНТРАЛЬНА ЧАСТИНА --- */}
+      {/* --- ЦЕНТРАЛЬНА ЧАСТИНА (Без змін) --- */}
       <div style={styles.mainArea}>
-        
-        {/* Вкладки (Tabs) */}
         <div style={styles.tabsBar}>
           <div style={styles.activeTab}>
-            📄 {currentTask ? `${currentTask.title}.py` : 'No File'}
+            📄 {currentTask ? `${currentTask.title}.py` : 'No File Selected'}
           </div>
         </div>
-
-        {/* Редактор коду */}
+        
         <div style={styles.editor}>
           {currentTask ? (
             <>
-               {/* Номери рядків (візуально) */}
               <div style={{ color: '#666', marginRight: 10, textAlign: 'right', userSelect: 'none' }}>
-                1<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8<br/>9
+                1<br/>2<br/>3<br/>4<br/>5<br/>6
               </div>
-              
               <div style={{ flex: 1 }}>
                 <SyntaxHighlighter 
                   language="python" 
@@ -118,52 +134,45 @@ function PracticePage() {
                 </SyntaxHighlighter>
               </div>
             </>
-          ) : <div style={{padding: 20}}>Select a file to edit</div>}
+          ) : <div style={{padding: 20, color: '#777'}}>// Select a file from the explorer on the left</div>}
         </div>
 
-        {/* Панель управління (Кнопки) */}
         <div style={styles.actionPanel}>
           <div style={{ marginBottom: 10, color: '#888' }}>// TODO: Choose the correct variable assignment</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => runCode('a')} style={styles.button}>
+            <button onClick={() => runCode('a')} style={styles.button} disabled={!currentTask}>
               Option A: "{currentTask?.option_a}"
             </button>
-            <button onClick={() => runCode('b')} style={styles.button}>
+            <button onClick={() => runCode('b')} style={styles.button} disabled={!currentTask}>
               Option B: "{currentTask?.option_b}"
             </button>
           </div>
         </div>
 
-        {/* Термінал */}
         <div style={styles.terminal}>
           <div style={styles.terminalHeader}>
             <span style={{ marginRight: 15, borderBottom: '1px solid white' }}>TERMINAL</span>
-            <span style={{ marginRight: 15, color: '#777' }}>OUTPUT</span>
             <span style={{ color: '#777' }}>DEBUG CONSOLE</span>
           </div>
           <pre style={{ 
             color: output.includes('SUCCESS') ? '#4caf50' : (output.includes('ERROR') ? '#ff5252' : '#ccc'),
-            fontFamily: 'monospace',
-            margin: 0
+            fontFamily: 'monospace', margin: 0
           }}>
             {output}
           </pre>
         </div>
 
-        {/* Рядок стану (Status Bar) */}
         <div style={styles.statusBar}>
           <div style={styles.statusItem}>On branch: master*</div>
           <div style={styles.statusItem}>Python 3.10</div>
-          <div style={styles.statusItem}>Spaces: 4</div>
           <div style={styles.statusItem}>UTF-8</div>
         </div>
-
       </div>
     </div>
   );
 }
 
-// --- СТИЛІ (CSS-in-JS) ---
+// --- ТІ САМІ СТИЛІ (Можна не копіювати, якщо ти їх не міняла, але про всяк випадок) ---
 const styles = {
   container: { display: 'flex', height: '100vh', backgroundColor: '#1e1e1e', color: '#d4d4d4', fontFamily: 'Consolas, "Courier New", monospace', overflow: 'hidden' },
   sidebar: { width: '250px', backgroundColor: '#252526', borderRight: '1px solid #1e1e1e', display: 'flex', flexDirection: 'column' },
