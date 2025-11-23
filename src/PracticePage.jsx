@@ -114,7 +114,7 @@ function PracticePage({ specificLevel }) {
                       borderLeft: currentTask?.id === task.id ? '2px solid #61dafb' : '2px solid transparent'
                     }}
                   >
-                    <span style={{ marginRight: 8, marginLeft: 18 }}>py</span> 
+                    <span style={{ marginRight: 0, marginLeft: 18, color: '#61dafb', opacity: 0.8 }}>py.</span> 
                     {task.title}
                   </div>
               ))}
@@ -145,8 +145,11 @@ function PracticePage({ specificLevel }) {
           {currentTask ? (
             <div style={{ flex: 1, display: 'flex' }}>
               <div style={styles.lineNumbers}>
-                {Array.from({length: 10}, (_, i) => i + 1).map(n => <div key={n}>{n}</div>)}
-              </div>
+  {/* Розбиваємо код на рядки і для кожного малюємо цифру */}
+  {(currentTask.code || '').split('\n').map((_, i) => (
+    <div key={i} style={{ height: '22.5px' }}>{i + 1}</div>
+  ))}
+</div>
               <div style={{ flex: 1 }}>
                 <SyntaxHighlighter 
                   language="python" 
