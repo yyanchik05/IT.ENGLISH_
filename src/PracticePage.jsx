@@ -112,42 +112,34 @@ function PracticePage({ specificLevel }) {
  const renderCodeEditor = () => {
     if (!currentTask) return null;
 
-    // 1. Рахуємо загальну кількість рядків у коді (для нумерації)
     const totalLines = (currentTask.code || '').split('\n').length;
-
-    // 2. Визначаємо, що саме малювати справа (Контент)
     let content = null;
 
-    // СЦЕНАРІЙ: INPUT MODE
+    // --- СЦЕНАРІЙ 1: INPUT MODE ---
     if (currentTask.type === 'input' && currentTask.code.includes('____')) {
       const lines = currentTask.code.split('\n');
       const inputLineIndex = lines.findIndex(line => line.includes('____'));
       
-      const codeBefore = lines.slice(0, inputLineIndex).join('\n'); // Код до рядка з інпутом
-      const targetLine = lines[inputLineIndex];                     // Сам рядок з інпутом
-      const codeAfter = lines.slice(inputLineIndex + 1).join('\n'); // Код після
+      const codeBefore = lines.slice(0, inputLineIndex).join('\n');
+      const targetLine = lines[inputLineIndex];
+      const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
 
       const parts = targetLine.split('____');
 
       content = (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-          {/* Блок коду зверху */}
           {codeBefore && (
             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
               {codeBefore}
             </SyntaxHighlighter>
           )}
 
-          {/* РЯДОК З ІНПУТОМ (Жорстка висота 22.5px, щоб не стрибало) */}
           <div style={styles.inputRow}>
-            {/* Ліва частина тексту */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
                  {parts[0]}
                </SyntaxHighlighter>
             </div>
-            
-            {/* Інпут */}
             <input
               type="text"
               value={userInputValue}
@@ -157,8 +149,6 @@ function PracticePage({ specificLevel }) {
               autoFocus
               placeholder="..."
             />
-            
-            {/* Права частина тексту */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
                  {parts[1] || ""}
@@ -166,7 +156,6 @@ function PracticePage({ specificLevel }) {
             </div>
           </div>
 
-          {/* Блок коду знизу */}
           {codeAfter && (
             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
               {codeAfter}
@@ -175,21 +164,61 @@ function PracticePage({ specificLevel }) {
         </div>
       );
     
-    // СЦЕНАРІЙ: BUILDER MODE
+    // --- СЦЕНАРІЙ 2: BUILDER MODE (ВИПРАВЛЕНО ТУТ) ---
     } else if (currentTask.type === 'builder' && currentTask.code.includes('____')) {
-        const parts = currentTask.code.split('____');
+        // Тепер ми так само розбиваємо код на 3 частини
+        const lines = currentTask.code.split('\n');
+        const inputLineIndex = lines.findIndex(line => line.includes('____'));
+        
+        const codeBefore = lines.slice(0, inputLineIndex).join('\n');
+        const targetLine = lines[inputLineIndex];
+        const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
+
+        const parts = targetLine.split('____');
         const constructedString = selectedFragments.join(' ');
         
         content = (
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px', lineHeight: '1.5' }}>
-             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
-             <div style={styles.builderArea}>{constructedString || <span style={{opacity: 0.3}}>...</span>}</div>
-             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
-             {selectedFragments.length > 0 && <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo">⌫</button>}
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+             {/* Верхній блок */}
+             {codeBefore && (
+                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+                  {codeBefore}
+                </SyntaxHighlighter>
+             )}
+
+             {/* Рядок з конструктором (використовуємо inputRow для стабільності) */}
+             <div style={styles.inputRow}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                   <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                     {parts[0]}
+                   </SyntaxHighlighter>
+                </div>
+                
+                <div style={styles.builderArea}>
+                   {constructedString || <span style={{opacity: 0.3}}>...</span>}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                   <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                     {parts[1] || ""}
+                   </SyntaxHighlighter>
+                </div>
+                
+                {selectedFragments.length > 0 && (
+                  <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo">⌫</button>
+                )}
+             </div>
+
+             {/* Нижній блок */}
+             {codeAfter && (
+                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+                  {codeAfter}
+                </SyntaxHighlighter>
+             )}
           </div>
         );
 
-    // СЦЕНАРІЙ: ЗВИЧАЙНИЙ РЕЖИМ
+    // --- СЦЕНАРІЙ 3: ЗВИЧАЙНИЙ РЕЖИМ ---
     } else {
         content = (
             <SyntaxHighlighter 
@@ -203,17 +232,13 @@ function PracticePage({ specificLevel }) {
         );
     }
 
-    // 3. ПОВЕРТАЄМО СПІЛЬНУ ОБГОРТКУ (Нумерація + Контент)
     return (
        <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
-          {/* Стовпчик з цифрами (ЗАВЖДИ ЗЛІВА) */}
           <div style={styles.lineNumbers}>
             {Array.from({length: totalLines}, (_, i) => i + 1).map(n => (
               <div key={n} style={{ height: '22.5px', lineHeight: '22.5px' }}>{n}</div>
             ))}
           </div>
-
-          {/* Область коду */}
           <div style={{ flex: 1, paddingLeft: 10 }}>
             {content}
           </div>
