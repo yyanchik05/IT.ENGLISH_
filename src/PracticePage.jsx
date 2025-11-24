@@ -11,14 +11,14 @@ function PracticePage({ specificLevel }) {
   const [output, setOutput] = useState("Ready to run...");
   const [loading, setLoading] = useState(true);
   const [categoriesOpen, setCategoriesOpen] = useState({});
-  const [searchParams] = useSearchParams();
-  
-  // Стани для інпутів
   const [userInputValue, setUserInputValue] = useState("");
-  
-  // НОВЕ: Стан для режиму "Builder" (вибрані слова)
   const [selectedFragments, setSelectedFragments] = useState([]);
+  
+  // Хук для роботи з URL
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  // --- ЕФЕКТ 1: ТІЛЬКИ ЗАВАНТАЖЕННЯ ДАНИХ ---
+  // Запускається лише коли змінюється РІВЕНЬ (junior/middle/senior)
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -34,12 +34,12 @@ function PracticePage({ specificLevel }) {
         
         setTasks(loadedTasks);
         
+        // Відкриваємо категорії
         const uniqueCategories = [...new Set(loadedTasks.map(t => t.category))];
         const initialOpenState = {};
         uniqueCategories.forEach(cat => initialOpenState[cat] = true);
         setCategoriesOpen(initialOpenState);
-
-        if (loadedTasks.length > 0) setCurrentTask(loadedTasks[0]);
+        
         setLoading(false);
       } catch (error) {
         console.error("Error:", error);
@@ -47,12 +47,36 @@ function PracticePage({ specificLevel }) {
       }
     };
     fetchTasks();
-  }, [specificLevel]);
+  }, [specificLevel]); // <--- ВАЖЛИВО: Тут немає searchParams!
 
-  // Очищення при зміні завдання
+  // --- ЕФЕКТ 2: СИНХРОНІЗАЦІЯ З URL ---
+  // Запускається, коли завантажились TASKS або змінився URL
+  useEffect(() => {
+    if (tasks.length === 0) return;
+
+    const taskIdFromUrl = searchParams.get("task");
+
+    if (taskIdFromUrl) {
+      // Якщо в URL є ID, шукаємо це завдання
+      const foundTask = tasks.find(t => t.id === taskIdFromUrl);
+      if (foundTask && foundTask.id !== currentTask?.id) {
+        setCurrentTask(foundTask);
+      }
+    } else {
+      // Якщо в URL пусто, відкриваємо перше завдання і ТИХО пишемо його в URL
+      if (!currentTask) {
+        const firstTask = tasks[0];
+        setCurrentTask(firstTask);
+        setSearchParams({ task: firstTask.id }, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, searchParams]); // Слідкуємо за задачами та URL
+
+  // Очищення полів при зміні завдання
   useEffect(() => {
     setUserInputValue("");
-    setSelectedFragments([]); // Очищаємо вибрані слова
+    setSelectedFragments([]);
     setOutput("Ready to run...");
   }, [currentTask]);
 
@@ -60,10 +84,8 @@ function PracticePage({ specificLevel }) {
     if (!currentTask) return;
     
     let finalAnswer = "";
-
-    // Логіка для різних типів
     if (currentTask.type === 'builder') {
-      finalAnswer = selectedFragments.join(' '); // Склеюємо слова в речення
+      finalAnswer = selectedFragments.join(' ');
     } else {
       finalAnswer = answerToCheck || userInputValue;
     }
@@ -74,7 +96,7 @@ function PracticePage({ specificLevel }) {
     if (cleanAnswer === cleanCorrect) {
       setOutput(`>> BUILD SUCCESSFUL [0.5s]\n>> Result: "${finalAnswer}"`);
     } else {
-      setOutput(`>> FATAL ERROR: SyntaxException.\n>> Expected '${currentTask.correct}', but constructed '${finalAnswer}'.\n>> Incorrect word order or vocabulary used.\n>> Process finished with exit code 1.`);
+      setOutput(`>> FATAL ERROR: LogicException.\n>> The argument '${finalAnswer}' caused a runtime error.\n>> Please review the syntax and try again.\n>> Process finished with exit code 1.`);
     }
   };
 
@@ -82,30 +104,51 @@ function PracticePage({ specificLevel }) {
     setCategoriesOpen(prev => ({ ...prev, [category]: !prev[category] }));
   };
 
+  const handleFragmentClick = (word) => setSelectedFragments([...selectedFragments, word]);
+  const handleUndoFragment = () => setSelectedFragments(selectedFragments.slice(0, -1));
+
   const uniqueCategories = [...new Set(tasks.map(t => t.category))].sort();
 
-  // --- ЛОГІКА ДЛЯ BUILDER MODE (Клік по слову) ---
-  const handleFragmentClick = (word) => {
-    // Додаємо слово в список вибраних
-    setSelectedFragments([...selectedFragments, word]);
-  };
-
-  const handleUndoFragment = () => {
-    // Видаляємо останнє слово (Backspace)
-    setSelectedFragments(selectedFragments.slice(0, -1));
-  };
-
-  // --- РЕНДЕРИНГ РЕДАКТОРА ---
-  const renderCodeEditor = () => {
+ const renderCodeEditor = () => {
     if (!currentTask) return null;
 
-    // 1. INPUT MODE
+    // 1. Рахуємо загальну кількість рядків у коді (для нумерації)
+    const totalLines = (currentTask.code || '').split('\n').length;
+
+    // 2. Визначаємо, що саме малювати справа (Контент)
+    let content = null;
+
+    // СЦЕНАРІЙ: INPUT MODE
     if (currentTask.type === 'input' && currentTask.code.includes('____')) {
-      const parts = currentTask.code.split('____');
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px' }}>
-           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
-           <input
+      const lines = currentTask.code.split('\n');
+      const inputLineIndex = lines.findIndex(line => line.includes('____'));
+      
+      const codeBefore = lines.slice(0, inputLineIndex).join('\n'); // Код до рядка з інпутом
+      const targetLine = lines[inputLineIndex];                     // Сам рядок з інпутом
+      const codeAfter = lines.slice(inputLineIndex + 1).join('\n'); // Код після
+
+      const parts = targetLine.split('____');
+
+      content = (
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          {/* Блок коду зверху */}
+          {codeBefore && (
+            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+              {codeBefore}
+            </SyntaxHighlighter>
+          )}
+
+          {/* РЯДОК З ІНПУТОМ (Жорстка висота 22.5px, щоб не стрибало) */}
+          <div style={styles.inputRow}>
+            {/* Ліва частина тексту */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+               <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                 {parts[0]}
+               </SyntaxHighlighter>
+            </div>
+            
+            {/* Інпут */}
+            <input
               type="text"
               value={userInputValue}
               onChange={(e) => setUserInputValue(e.target.value)}
@@ -114,45 +157,41 @@ function PracticePage({ specificLevel }) {
               autoFocus
               placeholder="..."
             />
-           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
-        </div>
-      );
-    }
-
-    // 2. BUILDER MODE (НОВЕ!)
-    if (currentTask.type === 'builder' && currentTask.code.includes('____')) {
-      const parts = currentTask.code.split('____');
-      // Сформоване речення
-      const constructedString = selectedFragments.join(' ');
-
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px' }}>
-           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
-           
-           {/* Місце куди падають слова */}
-           <div style={styles.builderArea}>
-              {constructedString || <span style={{opacity: 0.3}}>...select words...</span>}
-           </div>
-
-           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
-           
-           {/* Кнопка стерти (якщо щось вибрано) */}
-           {selectedFragments.length > 0 && (
-             <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo last word">⌫</button>
-           )}
-        </div>
-      );
-    }
-
-    // 3. ЗВИЧАЙНИЙ РЕЖИМ
-    return (
-       <div style={{ flex: 1, display: 'flex' }}>
-          <div style={styles.lineNumbers}>
-            {(currentTask.code || '').split('\n').map((_, i) => (
-              <div key={i} style={{ height: '22.5px' }}>{i + 1}</div>
-            ))}
+            
+            {/* Права частина тексту */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+               <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                 {parts[1] || ""}
+               </SyntaxHighlighter>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
+
+          {/* Блок коду знизу */}
+          {codeAfter && (
+            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+              {codeAfter}
+            </SyntaxHighlighter>
+          )}
+        </div>
+      );
+    
+    // СЦЕНАРІЙ: BUILDER MODE
+    } else if (currentTask.type === 'builder' && currentTask.code.includes('____')) {
+        const parts = currentTask.code.split('____');
+        const constructedString = selectedFragments.join(' ');
+        
+        content = (
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px', lineHeight: '1.5' }}>
+             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
+             <div style={styles.builderArea}>{constructedString || <span style={{opacity: 0.3}}>...</span>}</div>
+             <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
+             {selectedFragments.length > 0 && <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo">⌫</button>}
+          </div>
+        );
+
+    // СЦЕНАРІЙ: ЗВИЧАЙНИЙ РЕЖИМ
+    } else {
+        content = (
             <SyntaxHighlighter 
               language="python" 
               style={atomOneDark} 
@@ -161,36 +200,41 @@ function PracticePage({ specificLevel }) {
             >
               {currentTask.code || "# Code missing"}
             </SyntaxHighlighter>
+        );
+    }
+
+    // 3. ПОВЕРТАЄМО СПІЛЬНУ ОБГОРТКУ (Нумерація + Контент)
+    return (
+       <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
+          {/* Стовпчик з цифрами (ЗАВЖДИ ЗЛІВА) */}
+          <div style={styles.lineNumbers}>
+            {Array.from({length: totalLines}, (_, i) => i + 1).map(n => (
+              <div key={n} style={{ height: '22.5px', lineHeight: '22.5px' }}>{n}</div>
+            ))}
+          </div>
+
+          {/* Область коду */}
+          <div style={{ flex: 1, paddingLeft: 10 }}>
+            {content}
           </div>
         </div>
     );
   };
 
-  // --- РЕНДЕРИНГ ПАНЕЛІ ДІЙ (Кнопки) ---
   const renderActionPanel = () => {
     if (!currentTask) return null;
 
-    if (currentTask.type === 'input') {
-      return (
-         <button onClick={() => runCode()} style={styles.runButton}>▶ EXECUTE SCRIPT</button>
-      );
-    }
+    if (currentTask.type === 'input') return <button onClick={() => runCode()} style={styles.runButton}>▶ EXECUTE SCRIPT</button>;
 
-    // НОВЕ: Панель для Builder Mode (слова-кнопки)
     if (currentTask.type === 'builder') {
+        const safeFragments = Array.isArray(currentTask.fragments) ? currentTask.fragments : [];
         return (
           <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
              <div style={{color: '#888', fontSize: '0.8rem'}}>// Click fragments to build the f-string:</div>
+             {safeFragments.length === 0 && <div style={{color: 'orange', fontSize: '0.8rem'}}>⚠ Error: No fragments found. Check Firebase.</div>}
              <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
-               {/* Беремо фрагменти з бази. Якщо їх немає - пустий масив */}
-               {(currentTask.fragments || []).map((word, index) => (
-                 <button 
-                    key={index} 
-                    onClick={() => handleFragmentClick(word)} 
-                    style={styles.fragmentBtn}
-                 >
-                    {word}
-                 </button>
+               {safeFragments.map((word, index) => (
+                 <button key={index} onClick={() => handleFragmentClick(word)} style={styles.fragmentBtn}>{word}</button>
                ))}
              </div>
              <button onClick={() => runCode()} style={{...styles.runButton, marginTop: 10}}>▶ VERIFY STRING</button>
@@ -198,7 +242,6 @@ function PracticePage({ specificLevel }) {
         )
     }
 
-    // Звичайні кнопки
     return (
         <div style={styles.gridOptions}>
           <button onClick={() => runCode('a')} style={styles.optionBtn}>var a = "{currentTask?.option_a}"</button>
@@ -209,12 +252,10 @@ function PracticePage({ specificLevel }) {
     );
   }
 
-
   if (loading) return <div style={styles.loadingScreen}>Loading...</div>;
 
   return (
     <div style={styles.container}>
-      {/* (Sidebar і Navigation без змін) */}
       <div style={styles.activityBar}>
          <div style={styles.activityTop}><Link to="/" style={styles.activityIcon}>🏠</Link></div>
          <div style={styles.activityMiddle}>
@@ -236,7 +277,12 @@ function PracticePage({ specificLevel }) {
                 {category}
               </div>
               {categoriesOpen[category] && tasks.filter(t => t.category === category).map(task => (
-                  <div key={task.id} onClick={() => setCurrentTask(task)} style={{...styles.fileItem, backgroundColor: currentTask?.id === task.id ? '#37373d' : 'transparent', color: currentTask?.id === task.id ? '#fff' : '#999', borderLeft: currentTask?.id === task.id ? '2px solid #61dafb' : '2px solid transparent'}}>
+                  <div key={task.id} 
+                       onClick={() => { 
+                         setCurrentTask(task);
+                         setSearchParams({ task: task.id }); 
+                       }} 
+                       style={{...styles.fileItem, backgroundColor: currentTask?.id === task.id ? '#37373d' : 'transparent', color: currentTask?.id === task.id ? '#fff' : '#999', borderLeft: currentTask?.id === task.id ? '2px solid #61dafb' : '2px solid transparent'}}>
                     <span style={{marginRight: 0, marginLeft: 18, color: '#61dafb', opacity: 0.8}}>py.</span> {task.title}
                   </div>
               ))}
@@ -249,18 +295,13 @@ function PracticePage({ specificLevel }) {
         <div style={styles.tabsBar}>
            <div style={styles.activeTab}><span style={{marginRight: 8, color: '#61dafb'}}>py</span> {currentTask ? `${currentTask.title}.py` : 'No File'}</div>
         </div>
-        
-        <div style={styles.editor}>
-           {renderCodeEditor()}
-        </div>
-
+        <div style={styles.editor}>{renderCodeEditor()}</div>
         <div style={styles.actionPanel}>
           <div style={styles.debugHeader}>
              <span>{currentTask?.type === 'input' ? 'MANUAL MODE' : (currentTask?.type === 'builder' ? 'CONSTRUCTOR MODE' : 'DEBUG CONSOLE')}</span>
           </div>
           {renderActionPanel()}
         </div>
-
         <div style={styles.terminal}>
           <div style={{marginBottom: 5, color: '#aaa', fontSize: '0.8rem', borderBottom: '1px solid #333'}}>OUTPUT</div>
           <pre style={{ color: output.includes('SUCCESS') ? '#4caf50' : (output.includes('ERROR') ? '#ff5252' : '#ccc'), fontFamily: 'monospace', margin: 0 }}>{output}</pre>
@@ -271,9 +312,10 @@ function PracticePage({ specificLevel }) {
 }
 
 const styles = {
-  // Старі стилі...
   container: { display: 'flex', height: '100vh', backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '"JetBrains Mono", "Fira Code", monospace', overflow: 'hidden' },
   loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1e1e1e', color: '#fff' },
+  
+  // --- Activity Bar & Sidebar ---
   activityBar: { width: '50px', backgroundColor: '#333333', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderRight: '1px solid #252526', zIndex: 10 },
   activityTop: { display: 'flex', flexDirection: 'column', gap: 20 },
   activityMiddle: { display: 'flex', flexDirection: 'column', gap: 15 },
@@ -286,50 +328,80 @@ const styles = {
   fileTree: { marginTop: 5, overflowY: 'auto', flex: 1 },
   folderHeader: { padding: '4px 20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center' },
   fileItem: { padding: '4px 20px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', transition: 'background 0.1s' },
+  
+  // --- Main Area ---
   mainArea: { flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#1e1e1e' },
   tabsBar: { backgroundColor: '#252526', height: '35px', display: 'flex', alignItems: 'flex-start', overflowX: 'auto' },
   activeTab: { backgroundColor: '#1e1e1e', padding: '8px 15px', fontSize: '0.85rem', borderTop: '1px solid #61dafb', color: '#fff', minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  
+  // --- Editor Area (ОНОВЛЕНО) ---
   editor: { flex: 1, padding: '20px', backgroundColor: '#1e1e1e', display: 'flex', overflow: 'auto' },
-  lineNumbers: { color: '#444', marginRight: 15, textAlign: 'right', userSelect: 'none', fontSize: '15px', lineHeight: '1.5', width: '30px' },
+  
+  lineNumbers: { 
+    color: '#444', 
+    marginRight: 0, // Прибрали відступ, щоб лінія була рівною
+    paddingRight: '15px', // Додали внутрішній відступ
+    textAlign: 'right', 
+    userSelect: 'none', 
+    fontSize: '15px', 
+    lineHeight: '1.5', 
+    width: '40px', // Трохи ширше
+    borderRight: '1px solid #333' // Вертикальна лінія розділення
+  },
+
+  // Новий стиль для звичайних блоків коду
+  blockCode: { 
+    background: 'transparent', 
+    margin: 0, 
+    padding: 0, 
+    fontSize: '15px', 
+    lineHeight: '1.5' 
+  },
+
+  // Новий стиль для рядка з інпутом (щоб він не стрибав)
+  inputRow: {
+    display: 'flex',
+    alignItems: 'center',
+    height: '22.5px', // Жорстка висота (15px * 1.5)
+    overflow: 'hidden'
+  },
+
+  // Оновлений стиль для частин коду в рядку з інпутом
+  inlineCode: { 
+    background: 'transparent', 
+    margin: 0, 
+    padding: 0, 
+    display: 'inline-block' 
+  },
+
+  // Оновлений інпут
+  inlineInput: { 
+    backgroundColor: 'transparent', 
+    border: 'none', 
+    borderBottom: '1px solid #61dafb', 
+    color: '#fff', 
+    fontFamily: 'inherit', 
+    fontSize: '15px', 
+    width: '120px', 
+    textAlign: 'center', 
+    outline: 'none', 
+    margin: '0 5px',
+    height: '20px', // Висота тексту
+    lineHeight: '20px'
+  },
+
+  // --- Panels & Buttons ---
   actionPanel: { padding: '15px', backgroundColor: '#1e1e1e', borderTop: '1px solid #333' },
   debugHeader: { fontSize: '0.75rem', color: '#aaa', marginBottom: 10, display: 'flex', justifyContent: 'space-between' },
   gridOptions: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 },
   optionBtn: { padding: '10px', backgroundColor: '#2d2d2d', border: '1px solid #444', color: '#ccc', cursor: 'pointer', borderRadius: '4px', textAlign: 'left', fontFamily: 'inherit', fontSize: '0.9rem', transition: '0.2s' },
   terminal: { height: '120px', backgroundColor: '#1e1e1e', borderTop: '1px solid #333', padding: '10px 15px', overflow: 'auto' },
-  
-  blockCode: { background: 'transparent', margin: 0, padding: 0, fontSize: '15px', lineHeight: '1.5' },
-  inlineCode: { background: 'transparent', margin: 0, padding: 0, display: 'flex', alignItems: 'center' },
-  inlineInput: { backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #61dafb', color: '#fff', fontFamily: 'inherit', fontSize: '15px', width: '100px', textAlign: 'center', outline: 'none', margin: '0 5px' },
   runButton: { backgroundColor: '#238636', color: '#fff', border: '1px solid rgba(240,246,252,0.1)', borderRadius: '6px', padding: '8px 20px', fontWeight: '600', cursor: 'pointer', width: '100%' },
-
-  // --- НОВІ СТИЛІ ДЛЯ BUILDER MODE ---
-  builderArea: {
-    borderBottom: '1px dashed #61dafb',
-    minWidth: '100px',
-    margin: '0 5px',
-    color: '#98c379', // String color
-    padding: '0 5px',
-    cursor: 'pointer'
-  },
-  fragmentBtn: {
-    backgroundColor: '#3e4451',
-    border: '1px solid #565c64',
-    color: '#abb2bf',
-    padding: '6px 12px',
-    borderRadius: '15px', // Round chips
-    cursor: 'pointer',
-    fontFamily: 'monospace',
-    fontSize: '0.9rem',
-    transition: '0.2s'
-  },
-  undoBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: '#e06c75',
-    cursor: 'pointer',
-    fontSize: '1.2rem',
-    marginLeft: 10
-  }
+  
+  // --- Builder Mode Styles ---
+  builderArea: { borderBottom: '1px dashed #61dafb', minWidth: '100px', margin: '0 5px', color: '#98c379', padding: '0 5px', cursor: 'pointer' },
+  fragmentBtn: { backgroundColor: '#3e4451', border: '1px solid #565c64', color: '#abb2bf', padding: '6px 12px', borderRadius: '15px', cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.9rem', transition: '0.2s' },
+  undoBtn: { background: 'transparent', border: 'none', color: '#e06c75', cursor: 'pointer', fontSize: '1.2rem', marginLeft: 10 }
 };
 
 export default PracticePage;
