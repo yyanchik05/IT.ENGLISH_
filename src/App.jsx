@@ -6,6 +6,7 @@ import HomePage from './HomePage';
 import PracticePage from './PracticePage';
 import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
+import ProfilePage from './ProfilePage';
 
 function App() {
   return (
@@ -30,6 +31,10 @@ function App() {
           <Route 
             path="/senior" 
             element={<PrivateRoute><PracticePage specificLevel="senior" /></PrivateRoute>} 
+          />
+          <Route 
+            path="/profile" 
+            element={<PrivateRoute><ProfilePage /></PrivateRoute>} 
           />
         </Routes>
       </Router>

@@ -250,7 +250,12 @@ function PracticePage({ specificLevel }) {
            <Link to="/middle" style={specificLevel === 'middle' ? styles.activityIconActive : styles.activityIcon}>M</Link>
            <Link to="/senior" style={specificLevel === 'senior' ? styles.activityIconActive : styles.activityIcon}>S</Link>
          </div>
-         <div style={styles.activityBottom}>⚙️</div>
+         <div style={styles.activityBottom}>
+  {/* Замість шестерні ставимо посилання на профіль */}
+  <Link to="/profile" style={styles.activityIcon} title="User Profile">
+    👤
+  </Link>
+</div>
       </div>
 
       <div style={styles.sidebar}>
