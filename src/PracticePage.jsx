@@ -12,7 +12,12 @@ function PracticePage({ specificLevel }) {
   const [loading, setLoading] = useState(true);
   const [categoriesOpen, setCategoriesOpen] = useState({});
   const [searchParams] = useSearchParams();
+  
+  // Стани для інпутів
   const [userInputValue, setUserInputValue] = useState("");
+  
+  // НОВЕ: Стан для режиму "Builder" (вибрані слова)
+  const [selectedFragments, setSelectedFragments] = useState([]);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -47,20 +52,29 @@ function PracticePage({ specificLevel }) {
   // Очищення при зміні завдання
   useEffect(() => {
     setUserInputValue("");
+    setSelectedFragments([]); // Очищаємо вибрані слова
     setOutput("Ready to run...");
   }, [currentTask]);
 
   const runCode = (answerToCheck) => {
     if (!currentTask) return;
     
-    const finalAnswer = answerToCheck || userInputValue;
+    let finalAnswer = "";
+
+    // Логіка для різних типів
+    if (currentTask.type === 'builder') {
+      finalAnswer = selectedFragments.join(' '); // Склеюємо слова в речення
+    } else {
+      finalAnswer = answerToCheck || userInputValue;
+    }
+    
     const cleanAnswer = (finalAnswer || "").toString().toLowerCase().trim();
     const cleanCorrect = (currentTask.correct || "").toString().toLowerCase().trim();
 
     if (cleanAnswer === cleanCorrect) {
-      setOutput(`>> BUILD SUCCESSFUL [0.5s]\n>> Input accepted: "${finalAnswer}"`);
+      setOutput(`>> BUILD SUCCESSFUL [0.5s]\n>> Result: "${finalAnswer}"`);
     } else {
-      setOutput(`>> FATAL ERROR: LogicException.\n>> The argument '${finalAnswer}' caused a runtime error.\n>> Please review the syntax and try again.\n>> Process finished with exit code 1.`);
+      setOutput(`>> FATAL ERROR: SyntaxException.\n>> Expected '${currentTask.correct}', but constructed '${finalAnswer}'.\n>> Incorrect word order or vocabulary used.\n>> Process finished with exit code 1.`);
     }
   };
 
@@ -70,35 +84,28 @@ function PracticePage({ specificLevel }) {
 
   const uniqueCategories = [...new Set(tasks.map(t => t.category))].sort();
 
-  // --- ЛОГІКА ВІДОБРАЖЕННЯ КОДУ (ВИПРАВЛЕНА) ---
+  // --- ЛОГІКА ДЛЯ BUILDER MODE (Клік по слову) ---
+  const handleFragmentClick = (word) => {
+    // Додаємо слово в список вибраних
+    setSelectedFragments([...selectedFragments, word]);
+  };
+
+  const handleUndoFragment = () => {
+    // Видаляємо останнє слово (Backspace)
+    setSelectedFragments(selectedFragments.slice(0, -1));
+  };
+
+  // --- РЕНДЕРИНГ РЕДАКТОРА ---
   const renderCodeEditor = () => {
     if (!currentTask) return null;
 
-    // Сценарій 1: INPUT MODE з пропуском ____
+    // 1. INPUT MODE
     if (currentTask.type === 'input' && currentTask.code.includes('____')) {
-      const lines = currentTask.code.split('\n');
-      const inputLineIndex = lines.findIndex(line => line.includes('____'));
-      
-      const codeBefore = lines.slice(0, inputLineIndex).join('\n');
-      const targetLine = lines[inputLineIndex];
-      const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
-
-      const parts = targetLine.split('____');
-
+      const parts = currentTask.code.split('____');
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-          {codeBefore && (
-            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
-              {codeBefore}
-            </SyntaxHighlighter>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px', lineHeight: '1.5', height: '22.5px' }}>
-            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
-              {parts[0]}
-            </SyntaxHighlighter>
-            
-            <input
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px' }}>
+           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
+           <input
               type="text"
               value={userInputValue}
               onChange={(e) => setUserInputValue(e.target.value)}
@@ -107,22 +114,37 @@ function PracticePage({ specificLevel }) {
               autoFocus
               placeholder="..."
             />
-            
-            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
-              {parts[1] || ""}
-            </SyntaxHighlighter>
-          </div>
-
-          {codeAfter && (
-            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
-              {codeAfter}
-            </SyntaxHighlighter>
-          )}
+           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
         </div>
       );
     }
 
-    // Сценарій 2: Звичайний режим
+    // 2. BUILDER MODE (НОВЕ!)
+    if (currentTask.type === 'builder' && currentTask.code.includes('____')) {
+      const parts = currentTask.code.split('____');
+      // Сформоване речення
+      const constructedString = selectedFragments.join(' ');
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', fontFamily: '"JetBrains Mono", monospace', fontSize: '15px' }}>
+           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter>
+           
+           {/* Місце куди падають слова */}
+           <div style={styles.builderArea}>
+              {constructedString || <span style={{opacity: 0.3}}>...select words...</span>}
+           </div>
+
+           <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter>
+           
+           {/* Кнопка стерти (якщо щось вибрано) */}
+           {selectedFragments.length > 0 && (
+             <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo last word">⌫</button>
+           )}
+        </div>
+      );
+    }
+
+    // 3. ЗВИЧАЙНИЙ РЕЖИМ
     return (
        <div style={{ flex: 1, display: 'flex' }}>
           <div style={styles.lineNumbers}>
@@ -144,14 +166,57 @@ function PracticePage({ specificLevel }) {
     );
   };
 
+  // --- РЕНДЕРИНГ ПАНЕЛІ ДІЙ (Кнопки) ---
+  const renderActionPanel = () => {
+    if (!currentTask) return null;
+
+    if (currentTask.type === 'input') {
+      return (
+         <button onClick={() => runCode()} style={styles.runButton}>▶ EXECUTE SCRIPT</button>
+      );
+    }
+
+    // НОВЕ: Панель для Builder Mode (слова-кнопки)
+    if (currentTask.type === 'builder') {
+        return (
+          <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+             <div style={{color: '#888', fontSize: '0.8rem'}}>// Click fragments to build the f-string:</div>
+             <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
+               {/* Беремо фрагменти з бази. Якщо їх немає - пустий масив */}
+               {(currentTask.fragments || []).map((word, index) => (
+                 <button 
+                    key={index} 
+                    onClick={() => handleFragmentClick(word)} 
+                    style={styles.fragmentBtn}
+                 >
+                    {word}
+                 </button>
+               ))}
+             </div>
+             <button onClick={() => runCode()} style={{...styles.runButton, marginTop: 10}}>▶ VERIFY STRING</button>
+          </div>
+        )
+    }
+
+    // Звичайні кнопки
+    return (
+        <div style={styles.gridOptions}>
+          <button onClick={() => runCode('a')} style={styles.optionBtn}>var a = "{currentTask?.option_a}"</button>
+          <button onClick={() => runCode('b')} style={styles.optionBtn}>var b = "{currentTask?.option_b}"</button>
+          {currentTask?.option_c && <button onClick={() => runCode('c')} style={styles.optionBtn}>var c = "{currentTask.option_c}"</button>}
+          {currentTask?.option_d && <button onClick={() => runCode('d')} style={styles.optionBtn}>var d = "{currentTask.option_d}"</button>}
+        </div>
+    );
+  }
+
+
   if (loading) return <div style={styles.loadingScreen}>Loading...</div>;
 
   return (
     <div style={styles.container}>
+      {/* (Sidebar і Navigation без змін) */}
       <div style={styles.activityBar}>
-         <div style={styles.activityTop}>
-           <Link to="/" style={styles.activityIcon}>🏠</Link>
-         </div>
+         <div style={styles.activityTop}><Link to="/" style={styles.activityIcon}>🏠</Link></div>
          <div style={styles.activityMiddle}>
            <Link to="/junior" style={specificLevel === 'junior' ? styles.activityIconActive : styles.activityIcon}>J</Link>
            <Link to="/middle" style={specificLevel === 'middle' ? styles.activityIconActive : styles.activityIcon}>M</Link>
@@ -182,9 +247,7 @@ function PracticePage({ specificLevel }) {
 
       <div style={styles.mainArea}>
         <div style={styles.tabsBar}>
-           <div style={styles.activeTab}>
-             <span style={{marginRight: 8, color: '#61dafb'}}>py</span> {currentTask ? `${currentTask.title}.py` : 'No File'}
-           </div>
+           <div style={styles.activeTab}><span style={{marginRight: 8, color: '#61dafb'}}>py</span> {currentTask ? `${currentTask.title}.py` : 'No File'}</div>
         </div>
         
         <div style={styles.editor}>
@@ -193,21 +256,9 @@ function PracticePage({ specificLevel }) {
 
         <div style={styles.actionPanel}>
           <div style={styles.debugHeader}>
-             <span>{currentTask?.type === 'input' ? 'MANUAL MODE' : 'DEBUG CONSOLE'}</span>
+             <span>{currentTask?.type === 'input' ? 'MANUAL MODE' : (currentTask?.type === 'builder' ? 'CONSTRUCTOR MODE' : 'DEBUG CONSOLE')}</span>
           </div>
-          
-          {currentTask?.type === 'input' ? (
-             <button onClick={() => runCode()} style={styles.runButton}>
-               ▶ EXECUTE SCRIPT
-             </button>
-          ) : (
-             <div style={styles.gridOptions}>
-                <button onClick={() => runCode('a')} style={styles.optionBtn}>var a = "{currentTask?.option_a}"</button>
-                <button onClick={() => runCode('b')} style={styles.optionBtn}>var b = "{currentTask?.option_b}"</button>
-                {currentTask?.option_c && <button onClick={() => runCode('c')} style={styles.optionBtn}>var c = "{currentTask.option_c}"</button>}
-                {currentTask?.option_d && <button onClick={() => runCode('d')} style={styles.optionBtn}>var d = "{currentTask.option_d}"</button>}
-             </div>
-          )}
+          {renderActionPanel()}
         </div>
 
         <div style={styles.terminal}>
@@ -220,6 +271,7 @@ function PracticePage({ specificLevel }) {
 }
 
 const styles = {
+  // Старі стилі...
   container: { display: 'flex', height: '100vh', backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: '"JetBrains Mono", "Fira Code", monospace', overflow: 'hidden' },
   loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1e1e1e', color: '#fff' },
   activityBar: { width: '50px', backgroundColor: '#333333', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderRight: '1px solid #252526', zIndex: 10 },
@@ -248,7 +300,36 @@ const styles = {
   blockCode: { background: 'transparent', margin: 0, padding: 0, fontSize: '15px', lineHeight: '1.5' },
   inlineCode: { background: 'transparent', margin: 0, padding: 0, display: 'flex', alignItems: 'center' },
   inlineInput: { backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #61dafb', color: '#fff', fontFamily: 'inherit', fontSize: '15px', width: '100px', textAlign: 'center', outline: 'none', margin: '0 5px' },
-  runButton: { backgroundColor: '#238636', color: '#fff', border: '1px solid rgba(240,246,252,0.1)', borderRadius: '6px', padding: '8px 20px', fontWeight: '600', cursor: 'pointer', width: '100%' }
+  runButton: { backgroundColor: '#238636', color: '#fff', border: '1px solid rgba(240,246,252,0.1)', borderRadius: '6px', padding: '8px 20px', fontWeight: '600', cursor: 'pointer', width: '100%' },
+
+  // --- НОВІ СТИЛІ ДЛЯ BUILDER MODE ---
+  builderArea: {
+    borderBottom: '1px dashed #61dafb',
+    minWidth: '100px',
+    margin: '0 5px',
+    color: '#98c379', // String color
+    padding: '0 5px',
+    cursor: 'pointer'
+  },
+  fragmentBtn: {
+    backgroundColor: '#3e4451',
+    border: '1px solid #565c64',
+    color: '#abb2bf',
+    padding: '6px 12px',
+    borderRadius: '15px', // Round chips
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    fontSize: '0.9rem',
+    transition: '0.2s'
+  },
+  undoBtn: {
+    background: 'transparent',
+    border: 'none',
+    color: '#e06c75',
+    cursor: 'pointer',
+    fontSize: '1.2rem',
+    marginLeft: 10
+  }
 };
 
 export default PracticePage;
