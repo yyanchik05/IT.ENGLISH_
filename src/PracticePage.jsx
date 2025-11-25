@@ -131,50 +131,147 @@ function PracticePage({ specificLevel }) {
   const handleUndoFragment = () => setSelectedFragments(selectedFragments.slice(0, -1));
   const uniqueCategories = [...new Set(tasks.map(t => t.category))].sort();
 
-  // Копія твоїх рендерів (скорочено для економії місця тут, у тебе вони повні)
-  const renderCodeEditor = () => { /* Твій старий код renderCodeEditor */ 
+  const renderCodeEditor = () => {
     if (!currentTask) return null;
-    const totalLines = (currentTask.code || '').split('\n').length;
+
+    // --- ВИПРАВЛЕННЯ ТУТ ---
+    // Ми беремо код з бази і замінюємо текстові "\n" на справжні переноси рядків
+    const cleanCode = (currentTask.code || '').replace(/\\n/g, '\n');
+
+    // Далі використовуємо cleanCode замість currentTask.code
+    const totalLines = cleanCode.split('\n').length;
     let content = null;
-    if (currentTask.type === 'input' && currentTask.code.includes('____')) {
-        const parts = currentTask.code.split('____');
-        const lines = currentTask.code.split('\n');
-        const inputLineIndex = lines.findIndex(line => line.includes('____'));
-        const codeBefore = lines.slice(0, inputLineIndex).join('\n');
-        const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
-        content = (
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                {codeBefore && <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>{codeBefore}</SyntaxHighlighter>}
-                <div style={styles.inputRow}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter></div>
-                    <input type="text" value={userInputValue} onChange={(e) => setUserInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') runCode(); }} style={styles.inlineInput} autoFocus placeholder="..." />
-                    <div style={{ display: 'flex', alignItems: 'center' }}><SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter></div>
-                </div>
-                {codeAfter && <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>{codeAfter}</SyntaxHighlighter>}
+
+    // --- СЦЕНАРІЙ 1: INPUT MODE ---
+    if (currentTask.type === 'input' && cleanCode.includes('____')) {
+      const lines = cleanCode.split('\n');
+      const inputLineIndex = lines.findIndex(line => line.includes('____'));
+      
+      // Захист: якщо раптом ____ не знайдено (хоча include каже що є)
+      if (inputLineIndex === -1) return <div>Error parsing code structure</div>;
+
+      const codeBefore = lines.slice(0, inputLineIndex).join('\n');
+      const targetLine = lines[inputLineIndex];
+      const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
+
+      const parts = targetLine.split('____');
+
+      content = (
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          {codeBefore && (
+            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+              {codeBefore}
+            </SyntaxHighlighter>
+          )}
+
+          <div style={styles.inputRow}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+               <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                 {parts[0]}
+               </SyntaxHighlighter>
             </div>
-        );
-    } else if (currentTask.type === 'builder') {
-        const parts = currentTask.code.split('____');
-        const lines = currentTask.code.split('\n');
-        const inputLineIndex = lines.findIndex(line => line.includes('____'));
-        const codeBefore = lines.slice(0, inputLineIndex).join('\n');
-        const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
-        content = (
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                {codeBefore && <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>{codeBefore}</SyntaxHighlighter>}
-                <div style={styles.inputRow}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[0]}</SyntaxHighlighter></div>
-                    <div style={styles.builderArea}>{selectedFragments.join(' ') || <span style={{opacity: 0.3}}>...</span>}</div>
-                    <div style={{ display: 'flex', alignItems: 'center' }}><SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>{parts[1] || ""}</SyntaxHighlighter></div>
-                    {selectedFragments.length > 0 && <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo">⌫</button>}
-                </div>
-                {codeAfter && <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>{codeAfter}</SyntaxHighlighter>}
+            <input
+              type="text"
+              value={userInputValue}
+              onChange={(e) => setUserInputValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runCode(); }}
+              style={styles.inlineInput}
+              autoFocus
+              placeholder="..."
+            />
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+               <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                 {parts[1] || ""}
+               </SyntaxHighlighter>
             </div>
+          </div>
+
+          {codeAfter && (
+            <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+              {codeAfter}
+            </SyntaxHighlighter>
+          )}
+        </div>
+      );
+    
+    // --- СЦЕНАРІЙ 2: BUILDER MODE ---
+    } else if (currentTask.type === 'builder' && cleanCode.includes('____')) {
+        const lines = cleanCode.split('\n');
+        const inputLineIndex = lines.findIndex(line => line.includes('____'));
+        
+        if (inputLineIndex === -1) return <div>Error parsing builder structure</div>;
+
+        const codeBefore = lines.slice(0, inputLineIndex).join('\n');
+        const targetLine = lines[inputLineIndex];
+        const codeAfter = lines.slice(inputLineIndex + 1).join('\n');
+
+        const parts = targetLine.split('____');
+        const constructedString = selectedFragments.join(' ');
+        
+        content = (
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+             {codeBefore && (
+                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+                  {codeBefore}
+                </SyntaxHighlighter>
+             )}
+
+             <div style={styles.inputRow}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                   <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                     {parts[0]}
+                   </SyntaxHighlighter>
+                </div>
+                
+                <div style={styles.builderArea}>
+                   {constructedString || <span style={{opacity: 0.3}}>...</span>}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                   <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.inlineCode}>
+                     {parts[1] || ""}
+                   </SyntaxHighlighter>
+                </div>
+                
+                {selectedFragments.length > 0 && (
+                  <button onClick={handleUndoFragment} style={styles.undoBtn} title="Undo">⌫</button>
+                )}
+             </div>
+
+             {codeAfter && (
+                <SyntaxHighlighter language="python" style={atomOneDark} customStyle={styles.blockCode}>
+                  {codeAfter}
+                </SyntaxHighlighter>
+             )}
+          </div>
         );
+
+    // --- СЦЕНАРІЙ 3: ЗВИЧАЙНИЙ РЕЖИМ ---
     } else {
-        content = <SyntaxHighlighter language="python" style={atomOneDark} customStyle={{background: 'transparent', margin: 0, padding: 0, fontSize: '15px', lineHeight: '1.5'}} showLineNumbers={false}>{currentTask.code || "# Missing"}</SyntaxHighlighter>;
+        content = (
+            <SyntaxHighlighter 
+              language="python" 
+              style={atomOneDark} 
+              customStyle={{ background: 'transparent', margin: 0, padding: 0, fontSize: '15px', lineHeight: '1.5' }}
+              showLineNumbers={false}
+            >
+              {cleanCode || "# Code missing"}
+            </SyntaxHighlighter>
+        );
     }
-    return <div style={{flex: 1, display: 'flex', alignItems: 'flex-start'}}><div style={styles.lineNumbers}>{Array.from({length: totalLines}, (_, i) => i+1).map(n=><div key={n} style={{height: '22.5px', lineHeight: '22.5px'}}>{n}</div>)}</div><div style={{flex: 1, paddingLeft: 10}}>{content}</div></div>;
+
+    return (
+       <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start' }}>
+          <div style={styles.lineNumbers}>
+            {Array.from({length: totalLines}, (_, i) => i + 1).map(n => (
+              <div key={n} style={{ height: '22.5px', lineHeight: '22.5px' }}>{n}</div>
+            ))}
+          </div>
+          <div style={{ flex: 1, paddingLeft: 10 }}>
+            {content}
+          </div>
+        </div>
+    );
   };
 
   const renderActionPanel = () => { /* Твій старий код renderActionPanel */ 
