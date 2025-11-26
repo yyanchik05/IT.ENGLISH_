@@ -1,112 +1,163 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from "./contexts/AuthContext";
+import { motion } from "framer-motion";
 
 function HomePage() {
   const { currentUser } = useAuth();
+  
+  // Анімація появи знизу (використовуємо всюди для єдиного стилю)
+  const fadeInUp = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+  };
+
+  // Анімація для кнопок (пульсація)
+  const pulseAnimation = {
+    scale: [1, 1.02, 1],
+    transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+  };
+
   return (
     <div style={styles.container}>
       
-      {/* --- НАВІГАЦІЯ (Закріплена) --- */}
-      <nav style={styles.navbar}>
+      {/* --- НАВІГАЦІЯ --- */}
+      <motion.nav 
+        style={styles.navbar}
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         <div style={styles.logo}>IT.ENGLISH_</div>
         <div style={styles.navLinks}>
-  <a href="#features" style={styles.link}>Why Us</a>
-  <a href="#levels" style={styles.link}>Levels</a>
+          <a href="#features" style={styles.link}>Why Us</a>
+          <a href="#levels" style={styles.link}>Levels</a>
+          {currentUser ? (
+            <Link to="/profile" style={styles.ctaButtonSmall}>
+              👤 {currentUser.displayName || currentUser.email.split('@')[0]}
+            </Link>
+          ) : (
+            <Link to="/login" style={styles.ctaButtonSmall}>Sign In</Link>
+          )}
+        </div>
+      </motion.nav>
 
-  {/* УМОВА: Показуємо різне залежно від статусу */}
-  {currentUser ? (
-    <Link to="/profile" style={styles.ctaButtonSmall}>
-      {currentUser.email.split('@')[0]} {/* Показуємо ім'я до @ */}
-    </Link>
-  ) : (
-    <Link to="/login" style={styles.ctaButtonSmall}>Sign In</Link>
-  )}
-</div>
-      </nav>
-
-      {/* --- HERO SECTION (Екран 1) --- */}
+      {/* --- HERO SECTION (ВИПРАВЛЕНО) --- */}
       <section style={styles.heroSection}>
         <div style={styles.overlay}></div>
         <div style={styles.content}>
-          <h1 style={styles.title}>
+          
+          {/* Заголовок тепер просто виїжджає, без глючного друку */}
+          <motion.h1 
+            style={styles.title}
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+          >
             <span style={{ color: '#ccc' }}>while(</span>alive<span style={{ color: '#ccc' }}>)</span> <br/> 
-            <span style={{ color: '#61dafb' }}>learn_english()</span>;
-          </h1>
-          <p style={styles.subtitle}>
+            {/* Градієнтний текст */}
+            <span style={styles.gradientText}>learn_english()</span>;
+          </motion.h1>
+
+          <motion.p 
+            style={styles.subtitle}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 1 }}
+          >
             Stop learning "London is the capital". <br/>
             Start learning "Merge Conflict", "Daily Standup", and "Salary Negotiation".
-          </p>
-          <Link to="/practice" style={styles.mainButton}>
-            Launch Terminal_ 
-          </Link>
-        </div>
-      </section>
-
-      {/* --- FEATURES (Чому це круто) --- */}
-      <section id="features" style={styles.sectionDark}>
-        <h2 style={styles.sectionTitle}>// SYSTEM FEATURES</h2>
-        <div style={styles.gridThree}>
-          <FeatureCard 
-            icon="⚡" 
-            title="Grammar as Code" 
-            desc="We treat English tenses like syntax. If you use Past Simple wrong, it's a Compilation Error." 
-          />
-          <FeatureCard 
-            icon="🛠" 
-            title="Real Scenarios" 
-            desc="Practice replying to Jira tickets, writing commit messages, and arguing in Code Reviews." 
-          />
-          <FeatureCard 
-            icon="ue" 
-            title="Soft Skills Patch" 
-            desc="Special module for introverts: How to survive Small Talk before the meeting starts." 
-          />
-        </div>
-      </section>
-
-      {/* --- LEVELS (Джун, Мідл, Сеньйор) --- */}
-      <section id="levels" style={styles.sectionGray}>
-        <h2 style={styles.sectionTitle}>// CHOOSE YOUR DIFFICULTY</h2>
-        <div style={styles.gridThree}>
+          </motion.p>
           
-          {/* JUNIOR CARD */}
-          <LevelCard 
-            level="JUNIOR" 
-            color="#61dafb" // React Blue
-            desc="Focus on basic syntax and technical vocabulary. Learn to read documentation without Google Translate."
-            topics={['Present Perfect vs Past Simple', 'Basic Git Commands', 'Reporting Bugs']}
-          />
+          {/* Кнопка пульсує */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.8, duration: 0.5 }}
+            whileHover={{ scale: 1.05 }}
+          >
+            <Link to="/junior" style={styles.mainButton}>
+              <motion.span animate={pulseAnimation} style={{display: 'inline-block'}}>
+                 Launch Terminal_
+              </motion.span>
+            </Link>
+          </motion.div>
+        </div>
+      </section>
 
-          {/* MIDDLE CARD */}
-          <LevelCard 
-            level="MIDDLE" 
-            color="#4caf50" // Green
+      {/* --- FEATURES --- */}
+      <section id="features" style={styles.sectionDark}>
+        <motion.h2 
+          style={styles.sectionTitle}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeInUp}
+        >
+          // SYSTEM FEATURES
+        </motion.h2>
+        
+        <div style={styles.gridThree}>
+          {[
+            { icon: "⚡", title: "Grammar as Code", desc: "We treat English tenses like syntax. If you use Past Simple wrong, it's a Compilation Error." },
+            { icon: "🛠", title: "Real Scenarios", desc: "Practice replying to Jira tickets, writing commit messages, and arguing in Code Reviews." },
+            { icon: "ue", title: "Soft Skills Patch", desc: "Special module for introverts: How to survive Small Talk before the meeting starts." }
+          ].map((item, index) => (
+            <motion.div 
+              key={index}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={fadeInUp}
+              transition={{ delay: index * 0.2 }}
+            >
+              <FeatureCard {...item} />
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* --- LEVELS --- */}
+      <section id="levels" style={styles.sectionGray}>
+        <motion.h2 
+          style={styles.sectionTitle}
+          initial={{ opacity: 0, x: -50 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          // CHOOSE YOUR DIFFICULTY
+        </motion.h2>
+
+        <div style={styles.gridThree}>
+          <AnimatedLevelCard 
+            level="JUNIOR" color="#61dafb" delay={0.1}
+            desc="Level up your communication. Focus on project management, soft skills, and keeping the team updated.."
+            topics={['Daily Reports', 'Error Messages', 'Git & Actions']}
+          />
+          <AnimatedLevelCard 
+            level="MIDDLE" color="#4caf50" delay={0.3}
             desc="Communication is key. Learn how to suggest changes, conduct code reviews, and mentor juniors."
-            topics={['Polite Refactoring Requests', 'Daily Standup Speech', 'Writing Documentation']}
+            topics={['Daily Status', 'Daily Standup Speech', 'Writing Documentation']}
           />
-
-          {/* SENIOR CARD */}
-          <LevelCard 
-            level="SENIOR" 
-            color="#ff5252" // Red
+          <AnimatedLevelCard 
+            level="SENIOR" color="#ff5252" delay={0.5}
             desc="High-level architecture discussions and client negotiations. Master the art of saying 'No' politely."
-            topics={['System Design Presentation', 'Salary Negotiation', 'Handling Critical Feedback']}
+            topics={['System Design Presentation', 'Salary Negotiation', 'Crisis Management']}
           />
-
         </div>
       </section>
 
       {/* --- FOOTER --- */}
       <footer style={styles.footer}>
         <div style={{opacity: 0.6}}>© 2025 IT.English_ Open Source Project.</div>
-        <div style={{marginTop: 10}}>git push --force english-skills</div>
+        <div style={{marginTop: 10, fontFamily: 'monospace', color: '#666'}}>git push --force english-skills</div>
       </footer>
 
     </div>
   );
 }
 
-// --- КОМПОНЕНТИ-ЦЕГЛИНКИ (Щоб код був чистим) ---
+// --- КОМПОНЕНТИ ---
 
 function FeatureCard({ icon, title, desc }) {
   return (
@@ -118,36 +169,41 @@ function FeatureCard({ icon, title, desc }) {
   );
 }
 
-// Заміни функцію LevelCard на цю:
-function LevelCard({ level, color, desc, topics }) {
+function AnimatedLevelCard({ level, color, desc, topics, delay }) {
   return (
-    <div style={{ ...styles.card, borderTop: `3px solid ${color}` }}>
-      <div>
-        <h3 style={{ fontSize: '1.5rem', marginBottom: 10, color: color }}>{level} DEV</h3>
-        <p style={{ color: '#ccc', marginBottom: 20, minHeight: '60px' }}>{desc}</p>
-        
-        <div style={{ textAlign: 'left', background: '#111', padding: 15, borderRadius: 5, marginBottom: 20 }}>
-          <div style={{ color: '#777', fontSize: '0.8rem', marginBottom: 5 }}>MODULES_LOADED:</div>
-          {topics.map(t => (
-            <div key={t} style={{ color: '#eee', fontSize: '0.9rem', fontFamily: 'monospace' }}>➜ {t}</div>
-          ))}
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6, delay: delay }}
+      whileHover={{ y: -10, transition: { duration: 0.2 } }}
+      style={{ height: '100%' }} // <--- ВАЖЛИВО: Розтягуємо на всю висоту
+    >
+      <div style={{ ...styles.card, borderTop: `3px solid ${color}` }}>
+        {/* Обгортка для контенту (щоб він був зверху) */}
+        <div style={{ flex: 1 }}> 
+          <h3 style={{ fontSize: '1.5rem', marginBottom: 10, color: color }}>{level} DEV</h3>
+          <p style={{ color: '#ccc', marginBottom: 20, minHeight: '60px' }}>{desc}</p>
+          <div style={{ textAlign: 'left', background: '#111', padding: 15, borderRadius: 5, marginBottom: 20 }}>
+            <div style={{ color: '#777', fontSize: '0.8rem', marginBottom: 5 }}>MODULES_LOADED:</div>
+            {topics.map(t => (
+              <div key={t} style={{ color: '#eee', fontSize: '0.9rem', fontFamily: 'monospace' }}>➜ {t}</div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      
-<Link 
-  to={`/${level.toLowerCase()}`} 
-  style={{ ...styles.levelButton, border: `1px solid ${color}`, color: color }}
->
-  Select Level
-</Link>
-    </div>
+        {/* Кнопка (притиснута до низу завдяки styles.levelButton) */}
+        <Link to={`/${level.toLowerCase()}`} style={{ ...styles.levelButton, border: `1px solid ${color}`, color: color }}>
+          Select Level
+        </Link>
+      </div>
+    </motion.div>
   );
 }
 
 // --- СТИЛІ ---
 const styles = {
-  container: { fontFamily: "'Inter', sans-serif", color: 'white', overflowX: 'hidden' },
+  container: { fontFamily: "'Inter', sans-serif", color: 'white', overflowX: 'hidden', scrollBehavior: 'smooth' },
   navbar: {
     position: 'fixed', top: 0, width: '100%', height: '70px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -155,14 +211,13 @@ const styles = {
     background: 'rgba(20, 20, 20, 0.8)', backdropFilter: 'blur(10px)',
     borderBottom: '1px solid rgba(255,255,255,0.05)'
   },
-  logo: { fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'monospace', color: '#fff' },
+  logo: { fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'monospace', color: '#fff', letterSpacing: '-1px' },
   navLinks: { display: 'flex', gap: '30px', alignItems: 'center' },
   link: { cursor: 'pointer', color: '#aaa', textDecoration: 'none', fontSize: '0.9rem', transition: '0.3s' },
   ctaButtonSmall: {
     padding: '8px 20px', background: '#fff', color: '#000', textDecoration: 'none',
-    fontWeight: 'bold', borderRadius: '4px', fontSize: '0.9rem'
+    fontWeight: 'bold', borderRadius: '4px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px'
   },
-  // Hero Styles
   heroSection: {
     height: '100vh', width: '100%',
     backgroundImage: 'url("https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=2070&auto=format&fit=crop")',
@@ -171,33 +226,59 @@ const styles = {
   },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,10,0.85)' },
   content: { position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: '800px', padding: '20px' },
-  title: { fontSize: '3.5rem', fontWeight: '800', marginBottom: '20px', fontFamily: 'monospace' },
+  
+  // Заголовок без overflow:hidden, щоб текст не ховався
+  title: { fontSize: '3.5rem', fontWeight: '800', marginBottom: '20px', fontFamily: 'monospace', lineHeight: '1.2' },
+  
+  // Новий стиль для градієнта
+  gradientText: {
+    background: 'linear-gradient(90deg, #61dafb, #d2a8ff)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent'
+  },
+
   subtitle: { fontSize: '1.2rem', color: '#aaa', marginBottom: '40px', lineHeight: '1.6' },
   mainButton: {
     padding: '15px 40px', fontSize: '1.1rem', background: '#61dafb', color: '#000',
     textDecoration: 'none', borderRadius: '4px', fontWeight: 'bold',
-    boxShadow: '0 0 20px rgba(97, 218, 251, 0.3)'
+    boxShadow: '0 0 20px rgba(97, 218, 251, 0.3)', transition: '0.3s', display: 'inline-block'
   },
-  // Sections Styles
   sectionDark: { padding: '80px 50px', backgroundColor: '#141414', textAlign: 'center' },
   sectionGray: { padding: '80px 50px', backgroundColor: '#1a1a1a', textAlign: 'center' },
   sectionTitle: { fontSize: '1.8rem', marginBottom: '60px', fontFamily: 'monospace', color: '#555' },
   gridThree: {
-    display: 'flex', justifyContent: 'center', gap: '30px', flexWrap: 'wrap', maxWidth: '1200px', margin: '0 auto'
+    display: 'flex', 
+    justifyContent: 'center', 
+    gap: '30px', 
+    flexWrap: 'wrap', 
+    maxWidth: '1200px', 
+    margin: '0 auto',
+    alignItems: 'stretch' 
   },
+
   card: {
-    backgroundColor: '#222', padding: '30px', borderRadius: '10px', width: '350px',
-    textAlign: 'left', border: '1px solid #333', transition: '0.3s',
-    // --- НОВІ ВЛАСТИВОСТІ ДЛЯ ВИРІВНЮВАННЯ ---
+    backgroundColor: '#222', 
+    padding: '30px', 
+    borderRadius: '10px', 
+    width: '350px',
+    textAlign: 'left', 
+    border: '1px solid #333', 
+    transition: '0.3s',
     display: 'flex', 
     flexDirection: 'column', 
-    justifyContent: 'space-between' // Розтягує контент по висоті
+    height: '100%',
+    boxSizing: 'border-box'
   },
+
   levelButton: {
-    display: 'block', padding: '10px', textAlign: 'center',
-    textDecoration: 'none', borderRadius: '5px', fontWeight: 'bold',
-    transition: '0.3s',
-    marginTop: 'auto' // Магічна властивість: штовхає кнопку в самий низ
+    display: 'block', 
+    padding: '10px', 
+    textAlign: 'center',
+    textDecoration: 'none', 
+    borderRadius: '5px', 
+    fontWeight: 'bold',
+    transition: '0.3s', 
+    marginTop: 'auto' 
   },
   footer: {
     padding: '40px', textAlign: 'center', backgroundColor: '#0a0a0a', 
