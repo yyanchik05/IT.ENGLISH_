@@ -301,21 +301,58 @@ function PracticePage({ specificLevel }) {
     );
   };
 
-  const renderActionPanel = () => { /* Твій старий код renderActionPanel */ 
+  const renderActionPanel = () => {
     if (!currentTask) return null;
+
+    // 1. INPUT MODE
     if (currentTask.type === 'input') {
-        // ВАЖЛИВО: Передаємо userInputValue явно при кліку
         return (
             <button onClick={() => runCode(userInputValue)} style={styles.runButton}>
                 ▶ EXECUTE SCRIPT
             </button>
         );
     }
+
+    // 2. BUILDER MODE
     if (currentTask.type === 'builder') {
         const safeFragments = Array.isArray(currentTask.fragments) ? currentTask.fragments : [];
-        return <div style={{display: 'flex', flexDirection: 'column', gap: 10}}><div style={{color: '#888', fontSize: '0.8rem'}}>// Click fragments:</div><div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>{safeFragments.map((word, i) => <button key={i} onClick={() => handleFragmentClick(word)} style={styles.fragmentBtn}>{word}</button>)}</div><button onClick={() => runCode()} style={{...styles.runButton, marginTop: 10}}>▶ VERIFY STRING</button></div>;
+        return (
+          <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+             <div style={{color: '#888', fontSize: '0.8rem'}}>// Click fragments:</div>
+             <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
+               {safeFragments.map((word, i) => (
+                 <button key={i} onClick={() => handleFragmentClick(word)} style={styles.fragmentBtn}>{word}</button>
+               ))}
+             </div>
+             <button onClick={() => runCode()} style={{...styles.runButton, marginTop: 10}}>▶ VERIFY STRING</button>
+          </div>
+        );
     }
-    return <div style={styles.gridOptions}><button onClick={() => runCode('a')} style={styles.optionBtn}>var a = "{currentTask?.option_a}"</button><button onClick={() => runCode('b')} style={styles.optionBtn}>var b = "{currentTask?.option_b}"</button></div>;
+
+    // 3. CHOICE MODE (Виправлено: Додані C і D)
+    return (
+        <div style={styles.gridOptions}>
+          <button onClick={() => runCode('a')} style={styles.optionBtn}>
+             var a = "{currentTask?.option_a}"
+          </button>
+          <button onClick={() => runCode('b')} style={styles.optionBtn}>
+             var b = "{currentTask?.option_b}"
+          </button>
+          
+          {/* --- ОСЬ ЦЬОГО НЕ ВИСТАЧАЛО --- */}
+          {currentTask?.option_c && (
+            <button onClick={() => runCode('c')} style={styles.optionBtn}>
+               var c = "{currentTask.option_c}"
+            </button>
+          )}
+          {currentTask?.option_d && (
+            <button onClick={() => runCode('d')} style={styles.optionBtn}>
+               var d = "{currentTask.option_d}"
+            </button>
+          )}
+          {/* ----------------------------- */}
+        </div>
+    );
   };
 
   if (loading) return <div style={styles.loadingScreen}>Loading...</div>;
