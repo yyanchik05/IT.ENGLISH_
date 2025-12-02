@@ -65,7 +65,6 @@ export default function ResourcesPage() {
           <div style={styles.sidebar}>
             <div style={styles.header}>
                <h2 style={{margin: 0, color: '#61dafb'}}>README.md</h2>
-               <Link to="/junior" style={styles.closeBtn}>×</Link>
             </div>
             
             <div style={styles.section}>
