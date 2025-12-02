@@ -14,3 +14,31 @@ body, html {
 *, *::before, *::after {
   box-sizing: inherit;
 }
+
+/* --- UNIVERSAL DARK SCROLLBAR (VS Code Style) --- */
+
+/* Працює для ВСІХ елементів (*), а не тільки для body */
+*::-webkit-scrollbar {
+  width: 10px;               /* Ширина вертикального */
+  height: 10px;              /* Висота горизонтального */
+}
+
+*::-webkit-scrollbar-track {
+  background: #1e1e1e;       /* Колір фону (під колір твого редактора) */
+  border-left: 1px solid #333; /* Тонка лінія зліва */
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #424242; /* Колір повзунка (темно-сірий) */
+  border: 2px solid #1e1e1e; /* Відступ від країв (робить його тоншим) */
+  border-radius: 10px;       /* Закруглені краї */
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #5a5a5a; /* Трохи світліший при наведенні */
+}
+
+/* Прибираємо куток, де сходяться два скроли */
+*::-webkit-scrollbar-corner {
+  background: #1e1e1e;
+}
