@@ -8,6 +8,7 @@ import LoginPage from './LoginPage';
 import RegisterPage from './RegisterPage';
 import ProfilePage from './ProfilePage';
 import LeaderboardPage from './LeaderboardPage';
+import ResourcesPage from './ResourcesPage';
 
 function App() {
   return (
@@ -40,6 +41,10 @@ function App() {
           <Route 
   path="/leaderboard" 
   element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} 
+/>
+<Route 
+  path="/resources" 
+  element={<PrivateRoute><ResourcesPage /></PrivateRoute>} 
 />
         </Routes>
       </Router>

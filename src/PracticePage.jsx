@@ -393,6 +393,7 @@ function PracticePage({ specificLevel }) {
          {/* ВЕРХ: Будиночок */}
          <div style={styles.activityTop}>
            <Link to="/" style={styles.activityIcon} title="Home">🏠</Link>
+           <Link to="/resources" style={styles.activityIcon} title="Knowledge Base">📖</Link>
          </div>
 
          {/* СЕРЕДИНА: Рівні */}
