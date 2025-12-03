@@ -6,10 +6,39 @@ import Sidebar from "./components/Sidebar";
 import { motion } from "framer-motion";
 import { Crown, Medal, Shield, Zap } from "lucide-react";
 
+// --- ГЛОБАЛЬНІ ФУНКЦІЇ (Винесли їх назовні, щоб PodiumItem їх бачив) ---
+const getJobTitle = (score) => {
+  if (score < 5) return "Intern";
+  if (score < 15) return "Junior Dev";
+  if (score < 25) return "Middle Dev";
+  if (score < 50) return "Senior Dev";
+  if (score < 100) return "Tech Lead";
+  return "CTO";
+};
+
+const getRoleColor = (score) => {
+  if (score < 5) return "#abb2bf"; 
+  if (score < 15) return "#61dafb"; 
+  if (score < 25) return "#98c379"; 
+  if (score < 50) return "#d19a66"; 
+  return "#c678dd"; 
+};
+
+// Ачівки
+const getBadges = (score) => {
+  const badges = [];
+  if (score >= 10) badges.push("⚡");
+  if (score >= 50) badges.push("🛡️");
+  if (score >= 100) badges.push("🔥");
+  return badges;
+};
+// ---------------------------------------------------------------------
+
 export default function LeaderboardPage() {
   const { currentUser } = useAuth();
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
   const [myRank, setMyRank] = useState(null);
   const [myScoreData, setMyScoreData] = useState(null);
 
@@ -38,29 +67,16 @@ export default function LeaderboardPage() {
                 }
             }
         }
-      } catch (error) {
-        console.error("Error fetching leaderboard:", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch (error) { console.error(error); } 
+      finally { setLoading(false); }
     };
     fetchData();
   }, [currentUser]);
 
   const getAvatar = (user) => user.photoURL || `https://ui-avatars.com/api/?name=${user.username}&background=random&color=fff&size=128`;
-  const calculateLevel = (score) => Math.floor(score / 20) + 1;
-  
-  const getBadge = (score) => {
-    if (score > 100) return <Crown size={16} color="#ffd700" fill="#ffd700" />;
-    if (score > 50) return <Zap size={16} color="#f59e0b" fill="#f59e0b" />;
-    if (score > 10) return <Shield size={16} color="#61dafb" />;
-    return null;
-  };
 
-  // Функція для правильного відображення імені
   const getDisplayName = (user) => {
     const isMe = currentUser && user.id === currentUser.uid;
-    // Якщо це я - беремо ім'я з профілю (воно найсвіжіше), інакше з бази
     return isMe ? (currentUser.displayName || user.username) : user.username;
   };
 
@@ -74,9 +90,7 @@ export default function LeaderboardPage() {
       <div style={styles.contentContainer}>
         <div style={styles.mainWrapper}>
           <h1 style={styles.pageTitle}>HALL OF FAME 🏆</h1>
-          {loading ? (
-            <div style={{color: '#666'}}>Calculating ranks...</div>
-          ) : (
+          {loading ? <div style={{color: '#666'}}>Calculating ranks...</div> : (
             <>
               {/* PODIUM */}
               <div style={styles.podiumContainer}>
@@ -90,7 +104,7 @@ export default function LeaderboardPage() {
                 <div style={styles.listHeader}>
                   <span style={{width: '40px'}}>#</span>
                   <span style={{flex: 1}}>Cadet</span>
-                  <span style={{width: '80px'}}>Lvl</span>
+                  <span style={{width: '100px'}}>Role</span>
                   <span style={{width: '80px', textAlign: 'right'}}>Score</span>
                 </div>
 
@@ -101,23 +115,26 @@ export default function LeaderboardPage() {
                     return (
                       <motion.div 
                         key={user.id} 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.05 }}
                         style={isMe ? styles.rowMe : styles.row}
                       >
                         <div style={styles.rank}>{rank}</div>
                         <div style={styles.userInfo}>
                           <img src={getAvatar(user)} alt="av" style={styles.avatarSmall} />
                           <div style={{display: 'flex', flexDirection: 'column'}}>
-                             {/* Використовуємо функцію для імені */}
                              <span style={styles.username}>
-                                {getDisplayName(user)} {getBadge(user.score)}
+                                {getDisplayName(user)} 
+                                <span style={{marginLeft: 5, fontSize: '0.8rem'}}>{getBadges(user.score).join(' ')}</span>
                              </span>
                              {isMe && <span style={styles.meBadge}>YOU</span>}
                           </div>
                         </div>
-                        <div style={styles.level}>Lvl {calculateLevel(user.score)}</div>
+                        
+                        {/* Відображення ролі в списку */}
+                        <div style={{...styles.level, color: getRoleColor(user.score)}}>
+                           {getJobTitle(user.score)}
+                        </div>
+
                         <div style={styles.score}>{user.score} pts</div>
                       </motion.div>
                     );
@@ -135,7 +152,7 @@ export default function LeaderboardPage() {
                              <span style={styles.meBadge}>YOU ARE HERE</span>
                           </div>
                         </div>
-                        <div style={styles.level}>Lvl {calculateLevel(myScoreData.score)}</div>
+                        <div style={{...styles.level, color: getRoleColor(myScoreData.score)}}>{getJobTitle(myScoreData.score)}</div>
                         <div style={{...styles.score, color: '#fff'}}>{myScoreData.score} pts</div>
                     </div>
                 )}
@@ -148,19 +165,24 @@ export default function LeaderboardPage() {
   );
 }
 
+// --- ОНОВЛЕНИЙ PODIUM ITEM (Тепер показує роль) ---
 function PodiumItem({ user, rank, color, height, isFirst, name }) {
   const avatarUrl = user.photoURL || `https://ui-avatars.com/api/?name=${user.username}&background=random&color=fff&size=128`;
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + (rank * 0.1) }}
-      style={styles.podiumItem}
-    >
+    <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + (rank * 0.1) }} style={styles.podiumItem}>
       <div style={{position: 'relative', marginBottom: 10}}>
         {isFirst && <Crown size={32} color="#FFD700" fill="#FFD700" style={styles.crown} />}
         <img src={avatarUrl} alt="winner" style={{...styles.avatarBig, borderColor: color}} />
         <div style={{...styles.rankBadge, backgroundColor: color}}>{rank}</div>
       </div>
+      
       <div style={styles.podiumName}>{name}</div>
+      
+      {/* ДОДАЛИ РОЛЬ СЮДИ */}
+      <div style={{fontSize: '0.75rem', color: getRoleColor(user.score), fontWeight: 'bold', marginBottom: '2px'}}>
+        {getJobTitle(user.score)}
+      </div>
+      
       <div style={styles.podiumScore}>{user.score} pts</div>
       <div style={{...styles.podiumBar, height: height, backgroundColor: `${color}20`, borderTop: `4px solid ${color}`}}></div>
     </motion.div>
@@ -191,6 +213,6 @@ const styles = {
   avatarSmall: { width: '36px', height: '36px', borderRadius: '50%' },
   username: { color: '#d19a66', display: 'flex', alignItems: 'center', gap: '5px' },
   meBadge: { fontSize: '0.6rem', backgroundColor: '#61dafb', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' },
-  level: { width: '80px', color: '#56b6c2', fontSize: '0.9rem' },
+  level: { width: '100px', fontSize: '0.85rem', fontWeight: 'bold' },
   score: { width: '80px', textAlign: 'right', color: '#98c379', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1.1rem' }
 };
