@@ -10,8 +10,6 @@ export default function LeaderboardPage() {
   const { currentUser } = useAuth();
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Дані поточного користувача (якщо він не в топі)
   const [myRank, setMyRank] = useState(null);
   const [myScoreData, setMyScoreData] = useState(null);
 
@@ -19,43 +17,27 @@ export default function LeaderboardPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        // 1. Беремо Топ-50
-        const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(20));
+        const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(50));
         const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setLeaders(data);
 
-        // 2. Визначаємо місце користувача
         if (currentUser) {
-            // Перевіряємо, чи ми вже є в завантаженому списку
             const amIInTop = data.find(user => user.id === currentUser.uid);
-
             if (amIInTop) {
-                // Якщо ми в топі - ми вже знаємо ранг (індекс + 1)
                 setMyRank(data.indexOf(amIInTop) + 1);
                 setMyScoreData(amIInTop);
             } else {
-                // Якщо ми НЕ в топі - треба порахувати своє місце
-                // А. Беремо наші очки
                 const myDocSnap = await getDoc(doc(db, "leaderboard", currentUser.uid));
-                
                 if (myDocSnap.exists()) {
                     const myData = myDocSnap.data();
                     setMyScoreData({ id: myDocSnap.id, ...myData });
-
-                    // Б. Рахуємо, скільки людей мають БІЛЬШЕ очок, ніж ми
-                    const qHigher = query(
-                        collection(db, "leaderboard"), 
-                        where("score", ">", myData.score)
-                    );
-                    // getCountFromServer - це дешева операція, вона не качає дані, а просто рахує
+                    const qHigher = query(collection(db, "leaderboard"), where("score", ">", myData.score));
                     const snapshotHigh = await getCountFromServer(qHigher);
                     setMyRank(snapshotHigh.data().count + 1);
                 }
             }
         }
-
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
       } finally {
@@ -75,34 +57,35 @@ export default function LeaderboardPage() {
     return null;
   };
 
+  // Функція для правильного відображення імені
+  const getDisplayName = (user) => {
+    const isMe = currentUser && user.id === currentUser.uid;
+    // Якщо це я - беремо ім'я з профілю (воно найсвіжіше), інакше з бази
+    return isMe ? (currentUser.displayName || user.username) : user.username;
+  };
+
   const topThree = leaders.slice(0, 3);
   const restList = leaders.slice(3);
-
-  // Перевіряємо, чи треба показувати "прилиплий" рядок знизу
-  // Треба, якщо: дані завантажились, у нас є ранг, і ми не входимо в топ-50 (rank > 50)
   const showStickyFooter = !loading && myRank > 50 && myScoreData;
 
   return (
     <div style={styles.layout}>
       <Sidebar />
-
       <div style={styles.contentContainer}>
         <div style={styles.mainWrapper}>
-          
           <h1 style={styles.pageTitle}>HALL OF FAME 🏆</h1>
-
           {loading ? (
             <div style={{color: '#666'}}>Calculating ranks...</div>
           ) : (
             <>
-              {/* --- 1. PODIUM --- */}
+              {/* PODIUM */}
               <div style={styles.podiumContainer}>
-                {topThree[1] && <PodiumItem user={topThree[1]} rank={2} color="#C0C0C0" height="140px" />}
-                {topThree[0] && <PodiumItem user={topThree[0]} rank={1} color="#FFD700" height="170px" isFirst />}
-                {topThree[2] && <PodiumItem user={topThree[2]} rank={3} color="#CD7F32" height="120px" />}
+                {topThree[1] && <PodiumItem user={topThree[1]} rank={2} color="#C0C0C0" height="140px" name={getDisplayName(topThree[1])} />}
+                {topThree[0] && <PodiumItem user={topThree[0]} rank={1} color="#FFD700" height="170px" isFirst name={getDisplayName(topThree[0])} />}
+                {topThree[2] && <PodiumItem user={topThree[2]} rank={3} color="#CD7F32" height="120px" name={getDisplayName(topThree[2])} />}
               </div>
 
-              {/* --- 2. LIST --- */}
+              {/* LIST */}
               <div style={styles.listCard}>
                 <div style={styles.listHeader}>
                   <span style={{width: '40px'}}>#</span>
@@ -127,7 +110,10 @@ export default function LeaderboardPage() {
                         <div style={styles.userInfo}>
                           <img src={getAvatar(user)} alt="av" style={styles.avatarSmall} />
                           <div style={{display: 'flex', flexDirection: 'column'}}>
-                             <span style={styles.username}>{user.username} {getBadge(user.score)}</span>
+                             {/* Використовуємо функцію для імені */}
+                             <span style={styles.username}>
+                                {getDisplayName(user)} {getBadge(user.score)}
+                             </span>
                              {isMe && <span style={styles.meBadge}>YOU</span>}
                           </div>
                         </div>
@@ -136,23 +122,16 @@ export default function LeaderboardPage() {
                       </motion.div>
                     );
                   })}
-                  
-                  {/* Розділювач, якщо список довгий */}
-                  {myRank > 50 && (
-                      <div style={{textAlign: 'center', padding: '10px', color: '#666', fontSize: '1.2rem'}}>
-                          . . .
-                      </div>
-                  )}
+                  {myRank > 50 && <div style={{textAlign: 'center', padding: '10px', color: '#666'}}>. . .</div>}
                 </div>
 
-                {/* --- 3. STICKY USER ROW (Якщо ти не в топі) --- */}
                 {showStickyFooter && (
                     <div style={styles.stickyRow}>
                         <div style={{...styles.rank, color: '#61dafb'}}>{myRank}</div>
                         <div style={styles.userInfo}>
                           <img src={getAvatar(myScoreData)} alt="av" style={styles.avatarSmall} />
                           <div style={{display: 'flex', flexDirection: 'column'}}>
-                             <span style={{...styles.username, color: '#fff'}}>{myScoreData.username}</span>
+                             <span style={{...styles.username, color: '#fff'}}>{getDisplayName(myScoreData)}</span>
                              <span style={styles.meBadge}>YOU ARE HERE</span>
                           </div>
                         </div>
@@ -160,7 +139,6 @@ export default function LeaderboardPage() {
                         <div style={{...styles.score, color: '#fff'}}>{myScoreData.score} pts</div>
                     </div>
                 )}
-
               </div>
             </>
           )}
@@ -170,14 +148,11 @@ export default function LeaderboardPage() {
   );
 }
 
-function PodiumItem({ user, rank, color, height, isFirst }) {
+function PodiumItem({ user, rank, color, height, isFirst, name }) {
   const avatarUrl = user.photoURL || `https://ui-avatars.com/api/?name=${user.username}&background=random&color=fff&size=128`;
-  
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 + (rank * 0.1) }}
+      initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + (rank * 0.1) }}
       style={styles.podiumItem}
     >
       <div style={{position: 'relative', marginBottom: 10}}>
@@ -185,7 +160,7 @@ function PodiumItem({ user, rank, color, height, isFirst }) {
         <img src={avatarUrl} alt="winner" style={{...styles.avatarBig, borderColor: color}} />
         <div style={{...styles.rankBadge, backgroundColor: color}}>{rank}</div>
       </div>
-      <div style={styles.podiumName}>{user.username}</div>
+      <div style={styles.podiumName}>{name}</div>
       <div style={styles.podiumScore}>{user.score} pts</div>
       <div style={{...styles.podiumBar, height: height, backgroundColor: `${color}20`, borderTop: `4px solid ${color}`}}></div>
     </motion.div>
@@ -197,8 +172,6 @@ const styles = {
   contentContainer: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px', overflowY: 'auto' },
   mainWrapper: { width: '100%', maxWidth: '700px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   pageTitle: { color: '#fff', marginBottom: '40px', fontSize: '2rem', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 10px rgba(97, 218, 251, 0.5)' },
-
-  // Podium
   podiumContainer: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '15px', marginBottom: '40px', width: '100%' },
   podiumItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100px' },
   avatarBig: { width: '70px', height: '70px', borderRadius: '50%', border: '3px solid', objectFit: 'cover' },
@@ -207,24 +180,12 @@ const styles = {
   podiumName: { color: '#fff', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' },
   podiumScore: { color: '#888', fontSize: '0.8rem', marginBottom: '5px' },
   podiumBar: { width: '100%', borderRadius: '8px 8px 0 0' },
-
-  // List
   listCard: { backgroundColor: '#252526', borderRadius: '12px', width: '100%', border: '1px solid #333', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   listHeader: { display: 'flex', padding: '15px 20px', backgroundColor: '#21252b', borderBottom: '1px solid #333', color: '#888', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' },
-  scrollList: { maxHeight: '400px', overflowY: 'auto' }, // Список скролиться
-  
+  scrollList: { maxHeight: '400px', overflowY: 'auto' },
   row: { display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #2c313a', transition: '0.2s' },
   rowMe: { display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #2c313a', backgroundColor: 'rgba(97, 218, 251, 0.08)', borderLeft: '3px solid #61dafb' },
-  
-  // Sticky Footer (Це для тебе, якщо ти 750-та)
-  stickyRow: { 
-    display: 'flex', alignItems: 'center', padding: '15px 20px', 
-    backgroundColor: '#163f52', // Синій фон, щоб виділятися
-    borderTop: '2px solid #61dafb', 
-    boxShadow: '0 -5px 20px rgba(0,0,0,0.5)',
-    zIndex: 10
-  },
-
+  stickyRow: { display: 'flex', alignItems: 'center', padding: '15px 20px', backgroundColor: '#163f52', borderTop: '2px solid #61dafb', boxShadow: '0 -5px 20px rgba(0,0,0,0.5)', zIndex: 10 },
   rank: { width: '40px', color: '#666', fontWeight: 'bold' },
   userInfo: { flex: 1, display: 'flex', alignItems: 'center', gap: '12px' },
   avatarSmall: { width: '36px', height: '36px', borderRadius: '50%' },
