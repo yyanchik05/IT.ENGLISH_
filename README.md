@@ -1,12 +1,12 @@
-# IT.English_ 🚀
+# IT.English_ 
 
 > **while(alive) { learn_english(); }**
 
 An interactive, IDE-style platform designed to help IT professionals master technical English. Forget about "London is the capital of Great Britain". Learn how to write commit messages, report bugs, and negotiate salaries.
 
-![Project Preview](https://via.placeholder.com/1200x600?text=App+Screenshot+Here) 
+(![Project Preview](./images)) 
 
-## ✨ Features
+## Features
 
 * **IDE Simulation UI:** Dark theme, file explorer, terminal output, and syntax highlighting.
 * **Career-Based Levels:**
@@ -24,7 +24,7 @@ An interactive, IDE-style platform designed to help IT professionals master tech
 * **Knowledge Base:** Built-in dictionary and documentation links.
 * **Authentication:** Full user system via Firebase (Sign Up, Login, Profile).
 
-## 🛠 Tech Stack
+## Tech Stack
 
 * **Frontend:** React (Vite)
 * **Routing:** React Router DOM
@@ -32,7 +32,7 @@ An interactive, IDE-style platform designed to help IT professionals master tech
 * **Backend / BaaS:** Firebase (Authentication, Firestore Database)
 * **Code Highlighting:** React Syntax Highlighter
 
-## 🗄️ Database Structure (Firestore)
+## Database Structure (Firestore)
 
 ### `tasks` Collection
 Documents should have this structure:
