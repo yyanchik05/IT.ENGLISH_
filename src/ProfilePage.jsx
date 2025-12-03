@@ -46,16 +46,21 @@ export default function ProfilePage() {
 
   const handleUpdateName = async () => {
     try { 
-        // Оновлюємо в Auth
+        // 1. Оновлюємо офіційне ім'я користувача (в Auth)
         await updateProfile(currentUser, { displayName: newName }); 
         
-        // Оновлюємо в базі Leaderboard
+        // 2. ВАЖЛИВО: Оновлюємо ім'я в базі даних лідерів!
+        // Щоб інші користувачі теж бачили твоє нове ім'я, а не емейл
         const userRef = doc(db, "leaderboard", currentUser.uid);
+        
+        // Використовуємо merge: true, щоб не стерти очки (score)
         await setDoc(userRef, { username: newName }, { merge: true });
 
         setIsEditing(false); 
-        // Перезавантаження для миттєвого оновлення інтерфейсу
+        
+        // Оновлюємо сторінку, щоб зміни підтягнулися всюди
         window.location.reload();
+        
     } catch (error) { 
         console.error("Error updating profile:", error); 
     }
